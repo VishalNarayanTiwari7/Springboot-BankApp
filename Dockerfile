@@ -1,28 +1,34 @@
 #----------------------------------
-# Stage 1
+# Stage 1 (Builder)
 #----------------------------------
 
 FROM maven:3.8.3-openjdk-17 AS builder
 
-LABEL app=bankapp
-
 WORKDIR /src
 
-COPY . /src
+# ✅ Step 1: Copy only pom.xml (for caching dependencies)
+COPY pom.xml .
 
-RUN mvn clean install -DskipTests=true
+RUN mvn dependency:go-offline
+
+# ✅ Step 2: Copy remaining code
+COPY . .
+
+# ✅ Step 3: Build
+RUN mvn clean package -DskipTests
 
 
 #--------------------------------------
-# Stage 2
+# Stage 2 (Runtime)
 #--------------------------------------
 
-FROM eclipse-temurin:17-jdk-alpine AS deployer
+FROM eclipse-temurin:17-jdk-alpine
 
-WORKDIR /src
+WORKDIR /app
 
-COPY --from=builder /src/target/*.jar /src/target/bankapp.jar
+# Copy jar from builder
+COPY --from=builder /src/target/*.jar /app/bankapp.jar
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/src/target/bankapp.jar"]
+ENTRYPOINT ["java", "-jar", "/app/bankapp.jar"]
